@@ -7,6 +7,10 @@ const bodyparser = require('koa-bodyparser')
 const logger = require('koa-logger')
 const session = require('koa-generic-session')
 const redisStore = require('koa-redis')
+const { REDIS_CONF } = require('./conf/db')
+const path = require('path')
+const fs = require('fs')
+const morgan = require('koa-morgan')
 
 
 //*******************注册中间件***************
@@ -16,7 +20,7 @@ const blog = require('./routes/blog')
 const user = require('./routes/user')
 
 
-const { REDIS_CONF } = require('./conf/db')
+
 // error handler
 onerror(app)
 
@@ -40,6 +44,19 @@ app.use(async (ctx, next) => {
   console.log(`${ctx.method} ${ctx.url} - ${ms}ms`)
 })
 
+//日志
+const ENV = process.env.NODE_ENV
+if(ENV !== 'production') {
+  app.use(morgan('dev'))
+} else {
+  const logFileName = path.join(__dirname, 'logs', 'access.log')
+  const writeStream = fs.createWriteStream(logFileName, {
+    flags: 'a'
+  })
+  app.use(morgan('combined', {
+    stream: writeStream
+  }))
+}
 //session 配置
 app.keys = ['yq12%_']
 app.use(session({
@@ -50,12 +67,11 @@ app.use(session({
     maxAge: 24*60*60*1000
   },
   //配置redis
-  // store: redisStore({
-  //    //all:'127.0.0.1:6379' //写死本地redis 要根据配置环境设置
-  //    all: `${REDIS_CONF.host}:${REDIS_CONF.port}}`
-  // })
+  store: redisStore({
+     //all:'127.0.0.1:6379' //写死本地redis 要根据配置环境设置
+     all: `${REDIS_CONF.host}:${REDIS_CONF.port}:${REDIS_CONF.auth}`
+  })
 }))
-
 // 注册路由  routes
 app.use(index.routes(), index.allowedMethods())
 app.use(users.routes(), users.allowedMethods())
